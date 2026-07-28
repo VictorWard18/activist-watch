@@ -26,12 +26,11 @@
 Логика: дефицитный ресурс — не котировка, а **локейт борроу**, который пересыхает
 за часы после отчёта. FLASH существует, чтобы ты успел его занять.
 
-## Установка
+## Установка (локально)
 
 ```bash
 pip install -r requirements.txt
-export AW_TELEGRAM_BOT_TOKEN=...
-export AW_TELEGRAM_CHAT_ID=...
+cp .env.example .env      # и заполни токен/chat_id
 ```
 
 Токен бота — у @BotFather, chat_id — у @userinfobot.
@@ -49,40 +48,36 @@ python watch.py --reset    # сбросить seen-set (заново прогр�
 **Первый запуск — прогрев:** всё уже опубликованное помечается как виденное,
 пуши не идут. Алерты начинаются только с реально новых публикаций.
 
-## Деплой (systemd)
-
-`/etc/activist-watch.env`:
-```
-AW_TELEGRAM_BOT_TOKEN=...
-AW_TELEGRAM_CHAT_ID=...
-```
-
-`/etc/systemd/system/activist-watch.service`:
-```ini
-[Unit]
-Description=activist-watch
-After=network-online.target
-
-[Service]
-WorkingDirectory=/opt/activist-watch
-EnvironmentFile=/etc/activist-watch.env
-ExecStart=/usr/bin/python3 watch.py
-Restart=always
-RestartSec=15
-
-[Install]
-WantedBy=multi-user.target
-```
+## Деплой на дроплет (через GitHub)
 
 ```bash
-systemctl enable --now activist-watch
-journalctl -u activist-watch -f
+# 1. на дроплете
+git clone https://github.com/<user>/activist-watch.git /opt/activist-watch
+
+# 2. с Mac — секреты едут ОТДЕЛЬНО, их нет в репозитории
+scp .env root@ДРОПЛЕТ:/opt/activist-watch/.env
+
+# 3. на дроплете
+bash /opt/activist-watch/deploy/install.sh
 ```
 
-Ежедневный health-дайджест:
-```
-0 6 * * * cd /opt/activist-watch && /usr/bin/python3 watch.py --health
-```
+`install.sh` идемпотентен и делает всё: зависимости, проверку секретов,
+прогрев, systemd-юнит, крон на автообновление и health-дайджест.
+
+### Автообновление
+
+`deploy/update.sh` крутится в кроне каждые 10 минут:
+
+1. `git fetch`, сравнение с origin — если ничего не изменилось, выходит молча
+2. `--ff-only` merge (без слияний с конфликтами)
+3. **проверка синтаксиса всех .py перед рестартом** — битый коммит не уронит монитор
+4. `pip install -r requirements.txt`, `systemctl restart`
+5. при провале синтаксиса — `git reset --hard` на предыдущий коммит
+
+То есть цикл разработки: правишь локально → `git push` → в течение 10 минут
+дроплет сам подтянет и перезапустится.
+
+Логи: `journalctl -u activist-watch -f`, обновления — `data/update.log`.
 
 ## Покрытие (проверено 27.07.2026)
 
