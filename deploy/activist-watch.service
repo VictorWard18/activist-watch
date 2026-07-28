@@ -1,0 +1,20 @@
+[Unit]
+Description=activist-watch — activist short-seller publication monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__APP_DIR__/.env
+ExecStart=__PY__ watch.py
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+# the service only reads the web and writes its own SQLite
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
